@@ -808,26 +808,22 @@ class MainWindow(QMainWindow):
     def get_file_paths(self):
         from PyQt6.QtWidgets import QFileDialog
 
-        file_paths, _ = QFileDialog.getOpenFileNames(
+        # Open folder selection dialog
+        folder_path = QFileDialog.getExistingDirectory(
             self,
-            "Select Files to View",
+            "Select Folder to View Files",
             str(Path.home()),  # Start in home directory
-            "All Files (*.*)",
+            QFileDialog.Option.ShowDirsOnly,
         )
 
-        if file_paths:
-            return file_paths
+        if folder_path:
+            # Convert to Path object
+            folder_path = Path(folder_path)
         else:
-            # Default path if user cancels
-            return [
-                "/Users/nnn/workspace/scramble/background.js",
-                # "/Users/nnn/workspace/scramble/content.js",
-                # "/Users/nnn/workspace/scramble/manifest.json",
-                # "/Users/nnn/workspace/scramble/options.html",
-                "/Users/nnn/workspace/scramble/options.js",
-                # "/Users/nnn/workspace/scramble/popup.html",
-                # "/Users/nnn/workspace/scramble/popup.js",
-            ]
+            folder_path = Path.home() / "workspace" / "scramble"
+
+        # Collect all files in the selected folder (non-recursively)
+        return [str(f) for f in folder_path.iterdir() if f.is_file()]
 
 
 if __name__ == "__main__":
