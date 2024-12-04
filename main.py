@@ -20,9 +20,12 @@ from PyQt6.QtGui import QAction
 from PyQt6.QtGui import QBrush
 from PyQt6.QtGui import QColor
 from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QKeySequence
 from PyQt6.QtGui import QPainter
 from PyQt6.QtGui import QPen
+from PyQt6.QtGui import QShortcut
 from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QFileDialog
 from PyQt6.QtWidgets import QGraphicsItem
 from PyQt6.QtWidgets import QGraphicsObject
 from PyQt6.QtWidgets import QGraphicsProxyWidget
@@ -30,6 +33,8 @@ from PyQt6.QtWidgets import QGraphicsScene
 from PyQt6.QtWidgets import QGraphicsView
 from PyQt6.QtWidgets import QMainWindow
 from PyQt6.QtWidgets import QPushButton
+from PyQt6.QtWidgets import QStackedLayout
+from PyQt6.QtWidgets import QTextEdit
 from PyQt6.QtWidgets import QVBoxLayout
 from PyQt6.QtWidgets import QWidget
 
@@ -83,14 +88,8 @@ class ScrollableTextWidget(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        # Create stack layout for text edits
-        from PyQt6.QtWidgets import QStackedLayout
-
         self.stack_layout = QStackedLayout()
         self.stack_layout.setContentsMargins(0, 0, 0, 0)
-
-        # Create text edits
-        from PyQt6.QtWidgets import QTextEdit
 
         self.text_edit = QTextEdit()
         self.text_edit.setReadOnly(True)
@@ -604,8 +603,6 @@ class ClusterDiagramWidget(QGraphicsView):
         self.setup_shortcuts()
 
     def setup_shortcuts(self):
-        from PyQt6.QtGui import QShortcut, QKeySequence
-
         # Reset zoom shortcut
         self.reset_zoom_shortcut = QShortcut(QKeySequence("Ctrl+0"), self)
         self.reset_zoom_shortcut.activated.connect(self.fit_in_view)
@@ -807,8 +804,6 @@ class MainWindow(QMainWindow):
         self.showMaximized()
 
     def get_file_paths(self):
-        from PyQt6.QtWidgets import QFileDialog
-
         # Open folder selection dialog
         folder_path = QFileDialog.getExistingDirectory(
             self,
@@ -871,8 +866,6 @@ class MainWindow(QMainWindow):
         self.statusBar()
 
     def open_new_folder(self):
-        from PyQt6.QtWidgets import QFileDialog
-
         folder_path = QFileDialog.getExistingDirectory(
             self,
             "Select Folder to View Files",
