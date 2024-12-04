@@ -16,6 +16,7 @@ from PyQt6.QtCore import QPropertyAnimation
 from PyQt6.QtCore import QRectF
 from PyQt6.QtCore import Qt
 from PyQt6.QtCore import QThread
+from PyQt6.QtGui import QAction
 from PyQt6.QtGui import QBrush
 from PyQt6.QtGui import QColor
 from PyQt6.QtGui import QFont
@@ -798,8 +799,8 @@ class ClusterDiagramWidget(QGraphicsView):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("File Viewer")
-
+        self.setWindowTitle("Code Compass")
+        self.create_menus()
         file_paths = self.get_file_paths()
         self.diagram = ClusterDiagramWidget(file_paths)
         self.setCentralWidget(self.diagram)
@@ -819,11 +820,71 @@ class MainWindow(QMainWindow):
         if folder_path:
             # Convert to Path object
             folder_path = Path(folder_path)
+            return [str(f) for f in folder_path.iterdir() if f.is_file()]
         else:
-            folder_path = Path.home() / "workspace" / "scramble"
+            return []
 
-        # Collect all files in the selected folder (non-recursively)
-        return [str(f) for f in folder_path.iterdir() if f.is_file()]
+    def create_menus(self):
+        # Create menubar
+        menubar = self.menuBar()
+
+        # File Menu
+        file_menu = menubar.addMenu("&File")
+
+        open_folder_action = QAction("&Open Folder...", self)
+        open_folder_action.setShortcut("Ctrl+O")
+        open_folder_action.setStatusTip("Open a folder to view files")
+        open_folder_action.triggered.connect(self.open_new_folder)
+
+        exit_action = QAction("&Exit", self)
+        exit_action.setShortcut("Ctrl+Q")
+        exit_action.setStatusTip("Exit application")
+        exit_action.triggered.connect(self.close)
+
+        file_menu.addAction(open_folder_action)
+        file_menu.addSeparator()
+        file_menu.addAction(exit_action)
+
+        # View Menu
+        view_menu = menubar.addMenu("&View")
+
+        zoom_in_action = QAction("Zoom &In", self)
+        zoom_in_action.setShortcut("Ctrl++")
+        zoom_in_action.setStatusTip("Zoom in")
+        zoom_in_action.triggered.connect(lambda: self.diagram.zoom_in())
+
+        zoom_out_action = QAction("Zoom &Out", self)
+        zoom_out_action.setShortcut("Ctrl+-")
+        zoom_out_action.setStatusTip("Zoom out")
+        zoom_out_action.triggered.connect(lambda: self.diagram.zoom_out())
+
+        reset_zoom_action = QAction("&Reset Zoom", self)
+        reset_zoom_action.setShortcut("Ctrl+0")
+        reset_zoom_action.setStatusTip("Reset zoom level")
+        reset_zoom_action.triggered.connect(lambda: self.diagram.fit_in_view())
+
+        view_menu.addAction(zoom_in_action)
+        view_menu.addAction(zoom_out_action)
+        view_menu.addAction(reset_zoom_action)
+
+        # Create status bar
+        self.statusBar()
+
+    def open_new_folder(self):
+        from PyQt6.QtWidgets import QFileDialog
+
+        folder_path = QFileDialog.getExistingDirectory(
+            self,
+            "Select Folder to View Files",
+            str(Path.home()),
+            QFileDialog.Option.ShowDirsOnly,
+        )
+
+        if folder_path:
+            # Create new diagram with selected folder
+            file_paths = [str(f) for f in Path(folder_path).iterdir() if f.is_file()]
+            self.diagram = ClusterDiagramWidget(file_paths)
+            self.setCentralWidget(self.diagram)
 
 
 if __name__ == "__main__":
