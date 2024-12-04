@@ -1,5 +1,7 @@
-# Code Compass
-
+<p align="center">
+  <img src="https://github.com/namuan/code_compass/raw/main/assets/icon.png" width="128px"/>
+</p>
+<h1 align="center">Your code, decoded intelligently</h1>
 
 ## Getting Started
 

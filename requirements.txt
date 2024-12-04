@@ -1,3 +1,6 @@
 PyQt6
 numpy
 pathspec
+pygments
+litellm
+mistune
