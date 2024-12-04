@@ -629,32 +629,37 @@ class ClusterDiagramWidget(QGraphicsView):
         self.scene.setSceneRect(scene_rect)
 
     def display_file_nodes(self):
-        x_position = 0
-        spacing = 20  # Space between nodes
+        import math
 
-        for file_path in self.file_paths:
+        center_x = 0
+        center_y = 0
+        radius = 800  # Adjust based on number of nodes
+        node_width = 600
+        node_height = 400
+
+        for i, file_path in enumerate(self.file_paths):
             try:
                 with open(file_path) as file:
                     content = file.read()
             except Exception as e:
                 content = f"Error reading file: {str(e)}"
 
-            # Create the node
+            # Calculate position on circle
+            angle = (2 * math.pi * i) / len(self.file_paths)
+            x_position = center_x + radius * math.cos(angle) - node_width / 2
+            y_position = center_y + radius * math.sin(angle) - node_height / 2
+
             node = TextNodeItem(
                 filename=str(file_path),
                 content=content,
-                width=600,
-                height=400,
+                width=node_width,
+                height=node_height,
                 background_color="#E8E8E8",
             )
 
-            # Add to scene
             self.scene.addItem(node)
-            node.setPos(x_position, 0)
+            node.setPos(x_position, y_position)
             self.nodes.append(node)
-
-            # Update x_position for next node
-            x_position += node.expanded_width + spacing
 
     def fit_in_view(self):
         # Add padding around the items
