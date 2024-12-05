@@ -248,6 +248,7 @@ class FilenameLabelWidget(QGraphicsObject):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+
         self.text = ""
         self.padding = 5
         self.height = 25
@@ -255,6 +256,7 @@ class FilenameLabelWidget(QGraphicsObject):
         self.text_color = Qt.GlobalColor.black
         self.drag_start_pos = None
         self.is_showing_explanation = False
+        self._glow_intensity = 0.0
 
         # Enable mouse tracking and set cursor
         self.setAcceptHoverEvents(True)
@@ -297,11 +299,29 @@ class FilenameLabelWidget(QGraphicsObject):
         self.markdown = mistune.create_markdown(
             plugins=["table", "url", "strikethrough", "footnotes", "task_lists"]
         )
+        self.is_worker_running = False
         self.is_currently_explaining = False
+        self.glow_color = QColor(255, 140, 0)
+
+        # Animation for the glow effect
+        self.glow_animation = QPropertyAnimation(self, b"glow_intensity")
+        self.glow_animation.setDuration(1000)  # 1 second
+        self.glow_animation.setStartValue(0.0)
+        self.glow_animation.setEndValue(1.0)
+        self.glow_animation.setLoopCount(-1)  # Infinite loop
 
     def set_currently_explaining(self, is_explaining):
         """Set whether this node is currently being explained."""
         self.is_currently_explaining = is_explaining
+        self.update()
+
+    @pyqtProperty(float)
+    def glow_intensity(self):
+        return self._glow_intensity
+
+    @glow_intensity.setter
+    def glow_intensity(self, value):
+        self._glow_intensity = value
         self.update()
 
     def boundingRect(self):
@@ -334,12 +354,30 @@ class FilenameLabelWidget(QGraphicsObject):
             event.ignore()
 
     def paint(self, painter, option, widget):
+        # Save the painter state
+        painter.save()
+
         # Use the same background color and alpha as the parent node
         parent_color = self.parentItem().background_color
         painter.setBrush(QBrush(parent_color))
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawRoundedRect(self.boundingRect(), 5, 5)
 
+        if self.is_worker_running:
+            # Create glowing border effect
+            glow_color = QColor(self.glow_color)
+            glow_color.setAlphaF(0.5 * self._glow_intensity)
+
+            # Draw multiple glowing borders with decreasing alpha
+            for i in range(3):
+                pen = QPen(glow_color, 2 + i * 2)
+                painter.setPen(pen)
+                painter.drawRoundedRect(
+                    self.boundingRect().adjusted(i, i, -i, -i), 5, 5
+                )
+        else:
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawRoundedRect(self.boundingRect(), 5, 5)
+
+        # Draw the text
         painter.setPen(QPen(self.text_color))
         painter.setFont(self.font)
         text_rect = self.boundingRect().adjusted(self.padding, 0, -self.padding, 0)
@@ -348,6 +386,9 @@ class FilenameLabelWidget(QGraphicsObject):
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
             self.text,
         )
+
+        # Restore the painter state
+        painter.restore()
 
     def update_button_position(self):
         # Position the button at the right edge of the label
@@ -362,9 +403,14 @@ class FilenameLabelWidget(QGraphicsObject):
     def on_explain_clicked(self):
         parent_node = self.parentItem()
         if parent_node and hasattr(parent_node, "text_widget"):
-            # Expand the node first if it's collapsed
+            # Expand the node if it's not already expanded
             if not parent_node.is_expanded:
                 parent_node.toggle_expanded()
+
+            # Ensure node is visible
+            if parent_node.scene() and parent_node.scene().views():
+                view = parent_node.scene().views()[0]
+                view.ensureVisible(parent_node.sceneBoundingRect())
 
             if not self.is_showing_explanation:
                 parent_node.text_widget.switch_to_second_text_edit("")
@@ -375,6 +421,10 @@ class FilenameLabelWidget(QGraphicsObject):
                     self.explain_button.setEnabled(True)
                     self.is_showing_explanation = True
                 else:
+                    # Start glow effect
+                    self.is_worker_running = True
+                    self.glow_animation.start()
+
                     # Disable button during API call
                     self.explain_button.setEnabled(False)
                     self.explain_button.setText("...")
@@ -414,10 +464,16 @@ class FilenameLabelWidget(QGraphicsObject):
         self.update()
 
     def handle_explanation_finished(self):
+        # Stop glow effect
+        self.is_worker_running = False
+        self.glow_animation.stop()
+        self._glow_intensity = 0.0
+        self.update()
+
         self.explain_button.setText("Code")
         self.explain_button.setEnabled(True)
         self.is_showing_explanation = True
-        self.explanation_worker_finished.emit()  # Emit the signal
+        self.explanation_worker_finished.emit()
 
         # Clean up worker
         self.explanation_worker.deleteLater()
