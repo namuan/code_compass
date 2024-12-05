@@ -329,6 +329,7 @@ class FilenameLabelWidget(QGraphicsObject):
             self.accumulated_markdown += "\n\n*Explanation interrupted.*"
             html_content = self.markdown(self.accumulated_markdown)
             self.parentItem().text_widget.second_text_edit.setHtml(html_content)
+            self.explain_button.show()
 
     def set_currently_explaining(self, is_explaining):
         """Set whether this node is currently being explained."""
@@ -459,6 +460,7 @@ class FilenameLabelWidget(QGraphicsObject):
 
                     # Clear previous text and switch to second text edit
                     self.accumulated_markdown = ""
+                    self.explain_button.hide()
 
                     # Create and start worker thread
                     self.explanation_worker = ExplanationWorker(parent_node.content)
@@ -498,6 +500,7 @@ class FilenameLabelWidget(QGraphicsObject):
         self._glow_intensity = 0.0
         self.update()
 
+        self.explain_button.show()
         self.explain_button.setText("Code")
         self.explain_button.setEnabled(True)
         self.is_showing_explanation = True
