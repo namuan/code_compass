@@ -48,6 +48,11 @@ class ExplanationWorker(QThread):
     def __init__(self, code):
         super().__init__()
         self.code = code
+        self.is_running = True  # Flag to control execution
+
+    def stop(self):
+        """Stop the worker"""
+        self.is_running = False
 
     def run(self):
         try:
@@ -66,6 +71,9 @@ class ExplanationWorker(QThread):
             )
 
             for chunk in response:
+                if not self.is_running:
+                    break  # Exit if stopped
+
                 if "choices" in chunk and len(chunk["choices"]) > 0:
                     delta = chunk["choices"][0].get("delta", {})
                     if "content" in delta:
@@ -74,8 +82,9 @@ class ExplanationWorker(QThread):
             self.finished.emit()
 
         except Exception as e:
-            error_md = f"**Error:** {str(e)}"
-            self.chunk_received.emit(error_md)
+            if self.is_running:  # Only emit error if not manually stopped
+                error_md = f"**Error:** {str(e)}"
+                self.chunk_received.emit(error_md)
             self.finished.emit()
 
 
@@ -257,6 +266,7 @@ class FilenameLabelWidget(QGraphicsObject):
         self.drag_start_pos = None
         self.is_showing_explanation = False
         self._glow_intensity = 0.0
+        self.explanation_worker = None
 
         # Enable mouse tracking and set cursor
         self.setAcceptHoverEvents(True)
@@ -309,6 +319,16 @@ class FilenameLabelWidget(QGraphicsObject):
         self.glow_animation.setStartValue(0.0)
         self.glow_animation.setEndValue(1.0)
         self.glow_animation.setLoopCount(-1)  # Infinite loop
+
+    def stop_explanation(self):
+        """Stop the current explanation if running"""
+        if self.explanation_worker and self.is_worker_running:
+            self.explanation_worker.stop()
+            self.explanation_worker.wait()  # Wait for the thread to finish
+            self.handle_explanation_finished()
+            self.accumulated_markdown += "\n\n*Explanation interrupted.*"
+            html_content = self.markdown(self.accumulated_markdown)
+            self.parentItem().text_widget.second_text_edit.setHtml(html_content)
 
     def set_currently_explaining(self, is_explaining):
         """Set whether this node is currently being explained."""
@@ -413,8 +433,16 @@ class FilenameLabelWidget(QGraphicsObject):
                 view.ensureVisible(parent_node.sceneBoundingRect())
 
             if not self.is_showing_explanation:
+                # If there's a running worker, stop it first
+                if self.is_worker_running:
+                    self.stop_explanation()
+                    return
+
                 parent_node.text_widget.switch_to_second_text_edit("")
-                if self.accumulated_markdown:
+                if (
+                    self.accumulated_markdown
+                    and "Explanation interrupted" not in self.accumulated_markdown
+                ):
                     html_content = self.markdown(self.accumulated_markdown)
                     parent_node.text_widget.second_text_edit.setHtml(html_content)
                     self.explain_button.setText("Code")
@@ -476,8 +504,9 @@ class FilenameLabelWidget(QGraphicsObject):
         self.explanation_worker_finished.emit()
 
         # Clean up worker
-        self.explanation_worker.deleteLater()
-        self.explanation_worker = None
+        if self.explanation_worker:
+            self.explanation_worker.deleteLater()
+            self.explanation_worker = None
 
     def set_geometry(self, rect):
         # Update geometry and reposition the button
@@ -709,14 +738,6 @@ class ClusterDiagramWidget(QGraphicsView):
             # Clear highlight when finished
             self.clear_previous_highlight()
             return False
-
-    def explain_all_nodes(self):
-        """Start explaining all nodes one by one."""
-        # Reset the index and clear any existing highlights
-        self.current_explanation_index = 0
-        self.clear_previous_highlight()
-        # Start the explanation process
-        self.explain_next_node()
 
     def adjust_scroll_bars(self):
         current_scale = self.transform().m11()
@@ -985,33 +1006,39 @@ class MainWindow(QMainWindow):
         # Add Tools menu
         tools_menu = self.menuBar().addMenu("&Tools")
 
-        explain_all_action = QAction("&Explain All Files", self)
-        explain_all_action.setShortcut("Ctrl+E")
-        explain_all_action.setStatusTip("Explain all files one by one")
-        explain_all_action.triggered.connect(self.start_explain_all)
-
         explain_next_action = QAction("Explain &Next File", self)
         explain_next_action.setShortcut("Ctrl+N")
         explain_next_action.setStatusTip("Explain next file")
         explain_next_action.triggered.connect(self.explain_next)
 
-        tools_menu.addAction(explain_all_action)
         tools_menu.addAction(explain_next_action)
+
+        # Add stop explanation action
+        stop_explanation_action = QAction("&Stop Explanation", self)
+        stop_explanation_action.setShortcut("Esc")
+        stop_explanation_action.setStatusTip("Stop current explanation")
+        stop_explanation_action.triggered.connect(self.stop_current_explanation)
+        tools_menu.addAction(stop_explanation_action)
 
         # Create status bar
         self.statusBar()
-
-    def start_explain_all(self):
-        """Start explaining all files."""
-        self.diagram.explain_all_nodes()
-        self.update_status()
 
     def explain_next(self):
         """Explain the next file."""
         if not self.diagram.explain_next_node():
             self.statusBar().showMessage("All files explained")
+            return False
         else:
             self.update_status()
+            return True
+
+    def stop_current_explanation(self):
+        """Stop the currently running explanation if any"""
+        for node in self.diagram.nodes:
+            if node.filename_label.is_worker_running:
+                node.filename_label.stop_explanation()
+                self.statusBar().showMessage("Explanation stopped")
+                break
 
     def open_new_folder(self):
         folder_path = QFileDialog.getExistingDirectory(
