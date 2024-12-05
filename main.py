@@ -554,6 +554,10 @@ class TextNodeItem(QGraphicsObject):
             return
 
         self.is_expanded = expanded
+        # Update the expander circle's state
+        self.expander.is_expanded = expanded
+        self.expander.update()  # Force a repaint of the expander
+
         self.proxy.setVisible(expanded)
 
         # Update the label text based on state
