@@ -1006,8 +1006,8 @@ class MainWindow(QMainWindow):
         # Add Tools menu
         tools_menu = self.menuBar().addMenu("&Tools")
 
-        explain_next_action = QAction("Explain &Next File", self)
-        explain_next_action.setShortcut("Ctrl+N")
+        explain_next_action = QAction("Explain Next File", self)
+        explain_next_action.setShortcut(QKeySequence("Ctrl+Shift+E"))
         explain_next_action.setStatusTip("Explain next file")
         explain_next_action.triggered.connect(self.explain_next)
 
