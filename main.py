@@ -640,15 +640,8 @@ class ClusterDiagramWidget(QGraphicsView):
             self.previous_node = node
 
             if not node.filename_label.is_showing_explanation:
-                # Expand the node if it's not already expanded
-                if not node.is_expanded:
-                    node.toggle_expanded()
-
-                # Scroll to make the node visible
-                self.ensureVisible(node.sceneBoundingRect())
-
-                # Click the explain button
-                node.filename_label.explain_button.click()
+                # Directly call on_explain_clicked instead of simulating button click
+                node.filename_label.on_explain_clicked()
 
             self.current_explanation_index += 1
             return True
