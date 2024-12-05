@@ -960,8 +960,7 @@ class MainWindow(QMainWindow):
             folder_path = Path(folder_path)
             return [str(f) for f in folder_path.iterdir() if f.is_file()]
         else:
-            folder_path = Path().home() / "workspace" / "scramble"
-            return [str(f) for f in folder_path.iterdir() if f.is_file()]
+            return []
 
     def create_menus(self):
         # Create menubar
