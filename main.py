@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 
@@ -20,6 +21,7 @@ from PyQt6.QtGui import QAction
 from PyQt6.QtGui import QBrush
 from PyQt6.QtGui import QColor
 from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QIcon
 from PyQt6.QtGui import QKeySequence
 from PyQt6.QtGui import QPainter
 from PyQt6.QtGui import QPen
@@ -1057,8 +1059,20 @@ class MainWindow(QMainWindow):
             self.setCentralWidget(self.diagram)
 
 
+def resource_path(relative_path):
+    """Get absolute path to resource, works for dev and for PyInstaller"""
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    app.setWindowIcon(QIcon(resource_path("assets/icon.png")))
     window = MainWindow()
     window.show()
     sys.exit(app.exec())
