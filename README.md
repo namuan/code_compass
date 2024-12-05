@@ -3,6 +3,8 @@
 </p>
 <h1 align="center">Your code, decoded intelligently</h1>
 
+![](assets/code-compass-intro.gif)
+
 ## Getting Started
 
 * Install the required dependencies:
