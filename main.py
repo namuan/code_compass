@@ -362,6 +362,10 @@ class FilenameLabelWidget(QGraphicsObject):
     def on_explain_clicked(self):
         parent_node = self.parentItem()
         if parent_node and hasattr(parent_node, "text_widget"):
+            # Expand the node first if it's collapsed
+            if not parent_node.is_expanded:
+                parent_node.toggle_expanded()
+
             if not self.is_showing_explanation:
                 parent_node.text_widget.switch_to_second_text_edit("")
                 if self.accumulated_markdown:
