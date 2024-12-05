@@ -244,6 +244,8 @@ class ExpanderCircle(QGraphicsObject):
 
 
 class FilenameLabelWidget(QGraphicsObject):
+    explanation_worker_finished = pyqtSignal()
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.text = ""
@@ -282,7 +284,7 @@ class FilenameLabelWidget(QGraphicsObject):
         # Embed the button into the QGraphicsObject using QGraphicsProxyWidget
         self.proxy_widget = QGraphicsProxyWidget(self)
         self.proxy_widget.setWidget(self.explain_button)
-        self.proxy_widget.widget().hide()
+        self.proxy_widget.widget().show()
 
         # Position the button to the right edge of the label
         self.update_button_position()
@@ -295,6 +297,12 @@ class FilenameLabelWidget(QGraphicsObject):
         self.markdown = mistune.create_markdown(
             plugins=["table", "url", "strikethrough", "footnotes", "task_lists"]
         )
+        self.is_currently_explaining = False
+
+    def set_currently_explaining(self, is_explaining):
+        """Set whether this node is currently being explained."""
+        self.is_currently_explaining = is_explaining
+        self.update()
 
     def boundingRect(self):
         # Define the bounding rectangle for the label widget
@@ -379,7 +387,6 @@ class FilenameLabelWidget(QGraphicsObject):
                         self.handle_explanation_finished
                     )
                     self.explanation_worker.start()
-
             else:
                 # Switch back to code view
                 parent_node.text_widget.switch_to_first_text_edit()
@@ -406,6 +413,7 @@ class FilenameLabelWidget(QGraphicsObject):
         self.explain_button.setText("Code")
         self.explain_button.setEnabled(True)
         self.is_showing_explanation = True
+        self.explanation_worker_finished.emit()  # Emit the signal
 
         # Clean up worker
         self.explanation_worker.deleteLater()
@@ -447,6 +455,8 @@ class TextNodeItem(QGraphicsObject):
         self.proxy.setPos(self.padding, self.padding)
         self.proxy.setVisible(False)
 
+        self.background_color = QColor(background_color)
+
         # Create filename label
         self.filename_label = FilenameLabelWidget(self)
         # Initially show the full path
@@ -457,8 +467,6 @@ class TextNodeItem(QGraphicsObject):
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges)
         self.setCacheMode(QGraphicsItem.CacheMode.DeviceCoordinateCache)
-
-        self.background_color = QColor(background_color)
 
         self.animation = QPropertyAnimation(self, b"currentHeight")
         self.animation.setDuration(300)
@@ -491,10 +499,6 @@ class TextNodeItem(QGraphicsObject):
         # Update the label text based on state
         self.filename_label.set_text(str(Path(self.filename).absolute()))
         self.filename_label.setPos(0, -self.filename_label.height - 5)
-        if expanded:
-            self.filename_label.proxy_widget.widget().show()
-        else:
-            self.filename_label.proxy_widget.widget().hide()
 
         # Determine target height
         target_height = self.expanded_height if expanded else self.collapsed_height
@@ -523,7 +527,10 @@ class TextNodeItem(QGraphicsObject):
         rect = self.boundingRect()
         # Position the expander circle (top right)
         self.expander.setPos(
-            rect.right() - self.expander.circle_radius * 2 + 5, rect.top() - 5
+            rect.right() - self.expander.circle_radius * 2 + 5,
+            rect.top() - 5
+            if self.is_expanded
+            else (rect.height() - self.expander.circle_radius * 2) / 2,
         )
         # Update filename label position
         if self.is_expanded:
@@ -589,6 +596,10 @@ class ClusterDiagramWidget(QGraphicsView):
         self.panning = False
         self.last_mouse_pos = None
 
+        # Add method to access nodes
+        self.current_explanation_index = 0
+        self.previous_node = None
+
         # Create and display the file nodes
         self.nodes = []
         self.display_file_nodes()
@@ -606,6 +617,49 @@ class ClusterDiagramWidget(QGraphicsView):
         # Reset zoom shortcut
         self.reset_zoom_shortcut = QShortcut(QKeySequence("Ctrl+0"), self)
         self.reset_zoom_shortcut.activated.connect(self.fit_in_view)
+
+    def clear_previous_highlight(self):
+        """Clear highlight from the previously explained node."""
+        if self.previous_node:
+            self.previous_node.filename_label.set_currently_explaining(False)
+
+    def explain_next_node(self):
+        """Trigger explanation for the next node that hasn't been explained yet."""
+        # Clear previous highlight
+        self.clear_previous_highlight()
+
+        if self.current_explanation_index < len(self.nodes):
+            node = self.nodes[self.current_explanation_index]
+
+            # Set highlight for current node
+            node.filename_label.set_currently_explaining(True)
+            self.previous_node = node
+
+            if not node.filename_label.is_showing_explanation:
+                # Expand the node if it's not already expanded
+                if not node.is_expanded:
+                    node.toggle_expanded()
+
+                # Scroll to make the node visible
+                self.ensureVisible(node.sceneBoundingRect())
+
+                # Click the explain button
+                node.filename_label.explain_button.click()
+
+            self.current_explanation_index += 1
+            return True
+        else:
+            # Clear highlight when finished
+            self.clear_previous_highlight()
+            return False
+
+    def explain_all_nodes(self):
+        """Start explaining all nodes one by one."""
+        # Reset the index and clear any existing highlights
+        self.current_explanation_index = 0
+        self.clear_previous_highlight()
+        # Start the explanation process
+        self.explain_next_node()
 
     def adjust_scroll_bars(self):
         current_scale = self.transform().m11()
@@ -803,6 +857,14 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.diagram)
         self.showMaximized()
 
+        self.statusBar().showMessage("Ready")
+
+    def update_status(self):
+        """Update status bar with current progress."""
+        total = len(self.diagram.nodes)
+        current = self.diagram.current_explanation_index
+        self.statusBar().showMessage(f"Explaining file {current}/{total}")
+
     def get_file_paths(self):
         # Open folder selection dialog
         folder_path = QFileDialog.getExistingDirectory(
@@ -817,7 +879,8 @@ class MainWindow(QMainWindow):
             folder_path = Path(folder_path)
             return [str(f) for f in folder_path.iterdir() if f.is_file()]
         else:
-            return []
+            folder_path = Path().home() / "workspace" / "scramble"
+            return [str(f) for f in folder_path.iterdir() if f.is_file()]
 
     def create_menus(self):
         # Create menubar
@@ -862,8 +925,36 @@ class MainWindow(QMainWindow):
         view_menu.addAction(zoom_out_action)
         view_menu.addAction(reset_zoom_action)
 
+        # Add Tools menu
+        tools_menu = self.menuBar().addMenu("&Tools")
+
+        explain_all_action = QAction("&Explain All Files", self)
+        explain_all_action.setShortcut("Ctrl+E")
+        explain_all_action.setStatusTip("Explain all files one by one")
+        explain_all_action.triggered.connect(self.start_explain_all)
+
+        explain_next_action = QAction("Explain &Next File", self)
+        explain_next_action.setShortcut("Ctrl+N")
+        explain_next_action.setStatusTip("Explain next file")
+        explain_next_action.triggered.connect(self.explain_next)
+
+        tools_menu.addAction(explain_all_action)
+        tools_menu.addAction(explain_next_action)
+
         # Create status bar
         self.statusBar()
+
+    def start_explain_all(self):
+        """Start explaining all files."""
+        self.diagram.explain_all_nodes()
+        self.update_status()
+
+    def explain_next(self):
+        """Explain the next file."""
+        if not self.diagram.explain_next_node():
+            self.statusBar().showMessage("All files explained")
+        else:
+            self.update_status()
 
     def open_new_folder(self):
         folder_path = QFileDialog.getExistingDirectory(
