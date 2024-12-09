@@ -3,7 +3,11 @@
 </p>
 <h1 align="center">Your code, decoded intelligently</h1>
 
+## Demo
+
 ![](assets/code-compass-intro.gif)
+
+[Basic Intro](https://x.com/namuan_twt/status/1864638444707750070)
 
 ## Getting Started
 
