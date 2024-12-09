@@ -1,3 +1,4 @@
+import math
 import os
 import sys
 from pathlib import Path
@@ -666,7 +667,6 @@ class ClusterDiagramWidget(QGraphicsView):
     def __init__(self, file_paths, parent=None):
         super().__init__(parent)
         self.file_paths = [Path(path) for path in file_paths]
-        self.setMinimumSize(800, 600)
         self.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         # Set up the scene
@@ -768,8 +768,10 @@ class ClusterDiagramWidget(QGraphicsView):
 
         center_x = 0
         center_y = 0
-        radius = 800  # Adjust based on number of nodes
         node_width = 600
+        radius = self.calculate_radius(
+            len(self.file_paths), node_width
+        )  # Adjust based on number of nodes
         node_height = 400
 
         for i, file_path in enumerate(self.file_paths):
@@ -928,6 +930,16 @@ class ClusterDiagramWidget(QGraphicsView):
             factor = self.min_zoom / current_scale
 
         self.scale(factor, factor)
+
+    def calculate_radius(self, num_files, node_width):
+        desired_horizontal_spacing = 100  # Desired space between nodes
+        minimum_radius = 200  # Ensure the radius doesn't get too small
+
+        # Calculate the circumference needed to accommodate all nodes with spacing
+        required_circumference = num_files * (node_width + desired_horizontal_spacing)
+
+        # Calculate the radius based on the required circumference
+        return max(minimum_radius, required_circumference / (2 * math.pi))
 
 
 class MainWindow(QMainWindow):
